@@ -26,6 +26,7 @@ jobs:
       - name: Fetch commodities data
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
         run: python collect_data.py
       - name: Commit and push if changed
         run: |
