@@ -109,9 +109,9 @@ ITEMS = [
     ("SILVER",  "Silver (XAG/USD)",       "precious",   "yahoo", "SI=F",     None,                         None, None),
     ("COPPER",  "Copper (COMEX, $/lb)",   "industrial", "yahoo", "HG=F",     None,                         None, None),
     ("IRON",    "Iron Ore 62%Fe (TIO=F)", "industrial", "yahoo", "TIO=F",    None,                         None, None),
-    ("WTI",     "WTI Crude ($/bbl)",      "energy",     "eia",   "RWTC",     "petroleum/pri/spt",          "fred", "DCOILWTICO"),
-    ("BRENT",   "Brent Crude ($/bbl)",    "energy",     "eia",   "RBRTE",    "petroleum/pri/spt",          "fred", "DCOILBRENTEU"),
-    ("NG",      "Henry Hub NG ($/MMBtu)", "energy",     "eia",   "RNGWHHD",  "natural-gas/pri/fut",        "fred", "DHHNGSP"),
+    ("WTI",     "WTI Crude ($/bbl)",      "energy",     "yahoo", "CL=F",     None,                         "eia",  "RWTC|petroleum/pri/spt"),
+    ("BRENT",   "Brent Crude ($/bbl)",    "energy",     "yahoo", "BZ=F",     None,                         "eia",  "RBRTE|petroleum/pri/spt"),
+    ("NG",      "Henry Hub NG ($/MMBtu)", "energy",     "yahoo", "NG=F",     None,                         "eia",  "RNGWHHD|natural-gas/pri/fut"),
     ("URANIUM", "Uranium (URA ETF proxy)","specialty",  "yahoo", "URA",      None,                         None, None),
 ]
 
@@ -137,6 +137,11 @@ def fetch_one(item):
                 if f_src == "fred":
                     obs = fetch_fred(f_id)
                     used = "FRED (fallback)"
+                elif f_src == "eia":
+                    # EIA fallback id format: "SERIES|route"
+                    eia_id, eia_route = f_id.split("|")
+                    obs = fetch_eia(eia_id, eia_route)
+                    used = "EIA (fallback)"
             except Exception as e2:
                 print(f"  ✗ {key} fallback ({f_src}) 도 실패: {e2}", file=sys.stderr)
                 used = "FAIL"
