@@ -148,6 +148,51 @@ def fetch_one(item):
     return key, label, cat, p_src if used else "FAIL", p_id, used or "FAIL", obs
 
 
+# ── pre-IPO 프리미엄 (VCX·DXYZ) — 추가 2026-06-02 ──────────────────
+# NAV 는 Fundrise/Destiny API 미제공 → 분기/월간 수동 갱신 상수.
+# ⚠️ DXYZ NAV 는 placeholder. Destiny 월간 공시값으로 갱신할 것.
+NAV_PREIPO = {
+    "VCX":  {"nav": 18.96, "as_of": "2026-03-31", "label": "VCX (Fundrise)", "src": "Fundrise"},
+    "DXYZ": {"nav": 6.20,  "as_of": "2026-03-31", "label": "DXYZ (Destiny)",  "src": "Destiny"},
+}
+
+
+def build_preipo():
+    """VCX·DXYZ premium(=시장가÷NAV) + 90일 시계열 + 창내 peak/off-peak → preipo_data.js"""
+    items, series = {}, {}
+    for tk, info in NAV_PREIPO.items():
+        try:
+            obs = fetch_yahoo(tk)  # desc, [{date,value}]
+        except Exception as e:
+            print(f"  ✗ preipo {tk} 실패: {e}", file=sys.stderr)
+            continue
+        if not obs:
+            continue
+        nav = info["nav"]
+        series[tk] = [{"date": o["date"], "value": round((o["value"] / nav - 1) * 100, 1)} for o in obs]
+        price = obs[0]["value"]
+        prev = obs[1]["value"] if len(obs) > 1 else None
+        prem_pct = (price / nav - 1) * 100
+        delta = round(prem_pct - ((prev / nav - 1) * 100), 1) if prev else None
+        win = obs[:90]
+        peak_price = max(o["value"] for o in win)
+        items[tk] = {
+            "label": info["label"], "src": info["src"], "nav": nav, "nav_as_of": info["as_of"],
+            "date": obs[0]["date"], "price": round(price, 2),
+            "premium_pct": round(prem_pct, 1), "premium_mult": round(price / nav, 2),
+            "delta_pp": delta,
+            "peak_premium_pct": round((peak_price / nav - 1) * 100, 1),
+            "off_peak_pct": round(((price / nav) / (peak_price / nav) - 1) * 100, 1),
+        }
+        print(f"  ✓ preipo {tk}: {items[tk]['premium_mult']}x (off-peak {items[tk]['off_peak_pct']}%)")
+    payload = {"items": items, "series": series,
+               "collected_at": datetime.now(timezone.utc).isoformat()}
+    js = "window.PREIPO_DATA = " + json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + ";\n"
+    with open("preipo_data.js", "w", encoding="utf-8") as f:
+        f.write(js)
+    print(f"Wrote preipo_data.js ({len(js)/1024:.1f} KB, {len(items)} tickers)")
+
+
 def main():
     if not EIA_API_KEY and not FRED_API_KEY:
         print("ERROR: 둘 다 없음 (EIA_API_KEY 또는 FRED_API_KEY 중 하나 필요)", file=sys.stderr)
@@ -186,6 +231,11 @@ def main():
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         f.write(js)
     print(f"\nWrote {OUTPUT_PATH} ({len(js)/1024:.1f} KB)")
+
+    try:
+        build_preipo()
+    except Exception as e:
+        print(f"[warn] preipo build 실패(무시): {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
